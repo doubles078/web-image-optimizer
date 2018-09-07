@@ -1,7 +1,5 @@
-#run this in any directory add -v for verbose
-#pip install Image
-
 import os
+import getopt
 import sys
 from PIL import Image, ExifTags
 
@@ -20,97 +18,102 @@ def buildNewDirectoryForCompressedImages(filepath):
 
 	return path_for_compressed_images
 
-def compressImage(filepath):
+
+def compressImage(filepath, max_picture_width, compression_quality_percent):
 	#What percentage quality of the original image to keep. 65 to 85 is best bet here
-	compress_quality = 80
 	oldsize = os.stat(filepath).st_size
 	picture = Image.open(filepath)
 	#Build the new directory to put the compressed images in
 	path_for_compressed_images = buildNewDirectoryForCompressedImages(filepath) 	
 
 	#Resize the images and save them
-	resizeImages(picture, path_for_compressed_images, compress_quality)
+	resizeImage(picture, path_for_compressed_images, max_picture_width, compression_quality_percent)
 
 	#Keep these numbers for console logging
 	newsize = os.stat(os.path.join(os.getcwd(), path_for_compressed_images)).st_size
 	percent = round((oldsize-newsize)/float(oldsize)*100, 2)
 
+	picture.close()
+
 	return (oldsize, newsize, percent)
 
 
-def resizeImages(picture, path_for_compressed_images, compress_quality):
-	#Static width in pixels.  Could also change this to be a param in the CLI
-	new_width = 1200
+def findPictureOrientation(picture):
+	e = dict(picture._getexif().items()) if picture._getexif() != None else None
 
+	#Finds the correct Exif id number for orientaiton aka 274
+	#Then sets orientation equal to it 
 	for orientation in ExifTags.TAGS.keys():
 		if ExifTags.TAGS[orientation]=='Orientation':
 			break
-
+	
 	try:
-		e = picture._getexif()    # returns None if no EXIF data
+		#If there is orientation data, set it to the orientation variable
+		orientation = e[orientation]
 	except:
-		e = None
+		#If there is no orientation meta data, then default orientation to 0
+		print("There was no orientation data so default to 0.")
+		orientation = 0
+	
+	return orientation
 
-	if e is not None:
-		exif=dict(e.items())
 
-		try:
-			orientation = exif[orientation]
-		except:
-			print("There was no orientation # so I set it to 0")
-			orientation = 0
+def resizeImage(picture, path_for_compressed_images, max_picture_width, compression_quality_percent):
+	#Static width in pixels.  Could also change this to be a param in the CLI
+	new_width = max_picture_width
+	#Return the orientation of the picture
+	orientation = findPictureOrientation(picture)
 
-	if orientation == 1 or orientation == 0:
+	if orientation in [0,1]:
 		width, height = picture.size
-		new_height = int(new_width * height / width)
-		print("Height: " + str(height) + "Width: " + str(width) + ' New height: ')
 	else:
+		#PIL seems to flip these if the orientation is not 0 or 1
 		height, width = picture.size
-		new_height = int(new_width * height / width)
 
-	if width >= 1200:
-		if width > height:
-			if orientation == 1 or orientation == 0:
-				picture_resized = picture.resize((new_width, new_height), Image.ANTIALIAS)
-				print("Width bigger, width: " + str(width) + " height: " + str(height) + " New width: " + str(new_width) + " New height: " + str(new_height))
-			else:
-				picture_resized = picture.resize((new_height, new_width), Image.ANTIALIAS)
+	new_height = int(new_width * height / width)
+
+	#If the width of the image is larger than the assigned new width, then resize them
+	if width >= new_width:
+		if orientation in [0,1]:
+			resized_picture = picture.resize((new_width, new_height), Image.ANTIALIAS)
 		else:
-			if orientation == 6:
-				picture_resized = picture.resize((new_height, new_width), Image.ANTIALIAS)
-				print("ORIENTATION 6 Width bigger, width: " + str(width) + " height: " + str(height) + " New width: " + str(new_width) + " New height: " + str(new_height))
-			else:
-				picture_resized = picture.resize((new_width, new_height), Image.ANTIALIAS)
-				print("Height bigger, width: " + str(width) + " height: " + str(height))
+			resized_picture = picture.resize((new_height, new_width), Image.ANTIALIAS)
 	else:
-		picture_resized = picture
+		resized_picture = picture
 
-	print("Orientation: " + str(orientation))
-
-	if orientation == 3:
-		picture_resized = picture_resized.transpose(Image.ROTATE_180)
-	elif orientation == 6:
-		picture_resized = picture_resized.transpose(Image.ROTATE_270)
-		print("I reoriented")
-	elif orientation == 8:
-		picture_resized = picture_resized.transpose(Image.ROTATE_90)
-
-
+	picture_resized_and_rotated = rotateResizedPicture(resized_picture, orientation)
 
 	#Save the compressed and resized image to the correct path
-	picture_resized.save(path_for_compressed_images, optimize=True, quality=compress_quality)
+	picture_resized_and_rotated.save(path_for_compressed_images, optimize=True, quality=compression_quality_percent)
 
-	return picture_resized
+	return picture_resized_and_rotated
 
+
+def rotateResizedPicture(resized_picture, orientation):
+	if orientation == 3:
+		resized_picture = resized_picture.transpose(Image.ROTATE_180)
+	elif orientation == 6:
+		resized_picture = resized_picture.transpose(Image.ROTATE_270)
+	elif orientation == 8:
+		resized_picture = resized_picture.transpose(Image.ROTATE_90)
+
+	return resized_picture
 
 
 def main():
+	#Defaulting values
 	verbose = False
+	max_picture_width = 1200
+	compression_quality_percent = 80
 
-	#Checks the arguments passed in when running the python script from a console
-	if (len(sys.argv)>1):
-		if (sys.argv[1].lower()=="-v"):
+	for arg in sys.argv[1:]:
+		if arg.lower() in ['-v', 'verbose']:
 			verbose = True
+		elif int(arg) > 0:
+			max_picture_width = int(arg)
+			print("Max width set to " + arg)
+		else:
+			print("No arguments provided defaulting max width to 1200px and verbose output to false. (i.e. -v or an integer for max pic width)")
 
 	#Current Working Directory
 	pwd = os.getcwd()
@@ -124,7 +127,7 @@ def main():
 		for file in files:
 			if os.path.splitext(file)[1].lower() in ('.jpg', '.jpeg', '.png'):
 				filepath = os.path.join(subdir, file)
-				image = compressImage(filepath)
+				image = compressImage(filepath, max_picture_width, compression_quality_percent)
 				print(file)
 				if (verbose):
 					print("File compressed from %s to %s or %s%%" % (image[0],image[1],image[2]))
