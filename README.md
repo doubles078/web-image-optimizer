@@ -1,7 +1,7 @@
 # WebImageOptimizer
 Looks in a directory for .jpg, .jpeg, and .png files.  Then compresses and resizes them based on your specs.
 
-##Steps to Run
+## Steps to Run
 1. Make sure you have Python 3 installed
 2. Clone the repo into a directory full of images or full of more directories with images inside of them
 3. In your Terminal/CMD Prompt, run pip install Image
