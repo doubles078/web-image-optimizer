@@ -4,7 +4,7 @@ Looks in a directory for .jpg, .jpeg, and .png files.  Then compresses and resiz
 ## Steps to Run
 1. Make sure you have Python 3 installed
 2. Clone the repo into a directory full of images or full of more directories with images inside of them
-3. In your Terminal/CMD Prompt, run pip install Image
+3. In your Terminal/CMD Prompt, run pip install -r requirements.txt 
 4. Now run python imageopt.py
 5. Add -v for stats on compression or an integer to set the max picture width
 6. i.e. python imageopt.py -v 1000
