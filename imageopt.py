@@ -39,11 +39,9 @@ def compressImage(filepath, max_picture_width, compression_quality_percent):
 
 
 def findPictureOrientation(picture):
-
-
 	#PNGs dont have this attribute and need to be checked
 	if hasattr(picture, '_getexif'):
-		e = dict(picture._getexif().items())
+		e = dict(picture._getexif().items()) if picture._getexif() != None else None
 
 	#Finds the correct Exif id number for orientaiton aka 274
 	#Then sets orientation equal to it 
