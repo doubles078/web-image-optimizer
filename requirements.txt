@@ -1,2 +1,2 @@
 image==1.5.24
-Pillow==5.2.0
+Pillow==6.2.0
